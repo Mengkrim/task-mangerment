@@ -1,19 +1,25 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, field_validator
 from datetime import datetime
 from typing import Optional
 
 # Base class for shared fields
-class UserBase(BaseModel):
+class UserCreate(BaseModel):
     email: EmailStr
     full_name: Optional[str] = None
+    password: str
 
-# Used for user registration (input)
-class UserCreate(UserBase):
-    password: str = Field(..., min_length=6, max_length=64)
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if len(v.encode('utf-8')) > 72:
+            raise ValueError("Password is too long (maximum 72 bytes in UTF-8)")
+        return v
 
 # Used for API response
-class UserOut(UserBase):
+class UserOut(BaseModel):
     id: int
+    email: EmailStr
+    full_name: Optional[str] = None
     is_active: bool
     created_at: datetime  # fixed typo (was create_at)
 

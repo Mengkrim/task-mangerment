@@ -19,26 +19,23 @@ router = APIRouter(
 # REGISTER USER
 # ----------------------
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
-    # Check if user already exists
-    result = await db.execute(select(User).where(User.email == user.email))
+async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
+    # 1. Check if email already exists (BEFORE creating anything)
+    result = await db.execute(select(User).where(User.email == user_in.email))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
 
-    # Hash the password safely (truncate to 72 chars for bcrypt)
-    hashed_password = get_password_hash(user.password)
-
-    # Create new user instance
+    hashed_password = get_password_hash(user_in.password)
     db_user = User(
-        email=user.email,
-        full_name=user.full_name,
-        hashed_password=hashed_password
+        email=user_in.email,
+        hashed_password=hashed_password,
+        full_name=user_in.full_name
     )
+    
     db.add(db_user)
     await db.commit()
     await db.refresh(db_user)
-
-    return db_user
+    return UserOut.model_validate(db_user)
 
 # ----------------------
 # LOGIN USER
@@ -61,17 +58,17 @@ async def login(
         )
 
     # Check if user is active
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user"
-        )
+    # if not user.is_active:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_400_BAD_REQUEST,
+    #         detail="Inactive user"
+    #     )
 
     # Create access token
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    # access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": str(user.id)},  # use string ID for JWT
-        expires_delta=access_token_expires
+        # expires_delta=access_token_expires
     )
 
     return {"access_token": access_token, "token_type": "bearer"}
